@@ -6,6 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include "driver/gpio.h"
 #include "esp_timer.h"
 
@@ -16,62 +17,61 @@
 #define COUNT_HIGH      4000000
 #define COUNT_LOW       20
 
-#define DEBOUNCE_DELAY_MS       50
+#define DEBOUNCE_DELAY_MS           50
 
 int slicing_flag = 0;
-volatile long unsigned int periodic_count = 0;
-volatile long unsigned int idle_count = 0;
+volatile long unsigned int task2_count = 0;
+volatile long unsigned int task3_count = 0;
 
-static QueueHandle_t gpio_evt_queue = NULL;
+static QueueHandle_t count_evt_queue = NULL;
+
+SemaphoreHandle_t binarysem;
 
 void IRAM_ATTR gpio_isr_handler(void* arg)
 {
-    uint32_t gpio_num = (uint32_t) arg;
-    xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
+    xSemaphoreGive(binarysem);
 }
 
 void task1(void* arg)
 {
-    uint32_t io_num;
-    uint32_t current_state;
-    uint32_t last_state = 0;
-    bool led = 1;
+    uint32_t led_state = 0;
     while(1) {
-        if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
-            current_state = gpio_get_level(io_num);
-            if (current_state != last_state && current_state != 1) {
-                vTaskDelay(pdMS_TO_TICKS(DEBOUNCE_DELAY_MS));
-                gpio_set_level(GPIO_LED_PIN, led);
-                led = !led;
-                printf("button is pressed\n");
+        if(xSemaphoreTake(binarysem, portMAX_DELAY) == pdTRUE) {
+            printf("\n\nhello from task 1\n");
+            if (led_state == 0) {
+                gpio_set_level(GPIO_LED_PIN, 1);
+                led_state = 1;
+            } else {
+                gpio_set_level(GPIO_LED_PIN, 0);
+                led_state = 0;
             }
-            last_state = current_state;
+            printf("button is pressed\n");
+            vTaskDelay(pdMS_TO_TICKS(DEBOUNCE_DELAY_MS));
         }
     }
 }
 
 void task2(void* arg) {
+    uint32_t count;
     while(1) {
-        printf("\n\nhello from task 2\n\n");
-        slicing_flag = 0;
-        for (periodic_count=0; periodic_count<COUNT_HIGH; periodic_count++) {
-            if (slicing_flag == 1) {
-                printf("switch back periodic task with periodic count = %lu\n", periodic_count);
-                slicing_flag = 0;
-            }
-        }        
+        if(xQueueReceive(count_evt_queue, &count, portMAX_DELAY)) {
+            printf("\n\nhello from task 2 with count = %lu\n\n", count);
+            for (task2_count=0; task2_count<COUNT_HIGH; task2_count++) {
+            } 
+        }
+        vTaskDelay(pdMS_TO_TICKS(500));
     } 
 }
 
-void vApplicationIdleHook(void) {
-    printf("hello from idle task\n");
-    if (slicing_flag == 0) {
-        printf("switch to idle task with periodic count = %lu\n", periodic_count);
-        slicing_flag = 1;
-    }
-
-    for (idle_count=0; idle_count<COUNT_LOW; idle_count++) {
-
+void task3(void* arg) {
+    while(1) {
+        printf("\n\nhello from task 3\n\n");
+        for (task3_count=0; task3_count<COUNT_HIGH*2; task3_count++) {
+            if (task3_count == COUNT_HIGH/2) {
+                xQueueSendFromISR(count_evt_queue, &task3_count, NULL);
+            }
+        }        
+        taskYIELD();
     }
 }
 
@@ -95,11 +95,15 @@ void app_main(void)
     gpio_config(&io_conf);
 
     //Create Queue
-    gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
-    
+    count_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+
+    //Create semaphore
+    binarysem = xSemaphoreCreateBinary();
+
     //Create and Add Task
-    xTaskCreate(task2, "task2", 2048, NULL, 0, NULL);
-    xTaskCreate(task1, "task1", 2048, NULL, 2, NULL);
+    xTaskCreate(task1, "task1", 2048, NULL, 3, NULL);
+    xTaskCreate(task2, "task2", 2048, NULL, 2, NULL);
+    xTaskCreate(task3, "task3", 2048, NULL, 1, NULL);
 
     //Instal Interrupt Service Routine
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
