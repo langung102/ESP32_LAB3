@@ -13,8 +13,8 @@
 #define GPIO_LED_PIN            GPIO_NUM_2
 #define ESP_INTR_FLAG_DEFAULT   0
 
-#define COUNT_HIGH      4000000
-#define COUNT_LOW       20
+#define COUNT_HIGH              4000000
+#define COUNT_LOW               20
 
 #define DEBOUNCE_DELAY_MS       50
 
@@ -101,7 +101,7 @@ void app_main(void)
     xTaskCreate(task2, "task2", 2048, NULL, 0, NULL);
     xTaskCreate(task1, "task1", 2048, NULL, 2, NULL);
 
-    //Instal Interrupt Service Routine
+    //Install Interrupt Service Routine
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
     gpio_isr_handler_add(GPIO_BUTTON_PIN, gpio_isr_handler, (void*) GPIO_BUTTON_PIN);
 }
