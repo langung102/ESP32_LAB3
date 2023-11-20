@@ -28,7 +28,6 @@ void IRAM_ATTR gpio_isr_handler(void* arg)
 {
     uint32_t gpio_num = (uint32_t) arg;
     xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
-    gpio_intr_disable(GPIO_BUTTON_PIN);
 }
 
 void task1(void* arg)
@@ -99,7 +98,7 @@ void app_main(void)
     gpio_config(&io_conf);
 
     //Create Queue
-    gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+    gpio_evt_queue = xQueueCreate(1, sizeof(uint32_t));
     
     //Create and Add Task
     xTaskCreate(task2, "task2", 2048, NULL, 0, NULL);
