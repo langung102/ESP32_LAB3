@@ -38,6 +38,8 @@ void task1(void* arg)
     bool led = 1;
     while(1) {
         if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
+            printf("\n\nhello from task 1\n");
+            gpio_intr_disable(GPIO_BUTTON_PIN);
             current_state = gpio_get_level(io_num);
             if (current_state != last_state && current_state != 1) {
                 vTaskDelay(pdMS_TO_TICKS(DEBOUNCE_DELAY_MS));
@@ -46,6 +48,7 @@ void task1(void* arg)
                 printf("button is pressed\n");
             }
             last_state = current_state;
+            gpio_intr_enable(GPIO_BUTTON_PIN);
         }
     }
 }
@@ -95,7 +98,7 @@ void app_main(void)
     gpio_config(&io_conf);
 
     //Create Queue
-    gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+    gpio_evt_queue = xQueueCreate(1, sizeof(uint32_t));
     
     //Create and Add Task
     xTaskCreate(task2, "task2", 2048, NULL, 0, NULL);
