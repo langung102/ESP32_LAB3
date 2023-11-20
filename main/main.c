@@ -28,6 +28,7 @@ void IRAM_ATTR gpio_isr_handler(void* arg)
 {
     uint32_t gpio_num = (uint32_t) arg;
     xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
+    gpio_intr_disable(GPIO_BUTTON_PIN);
 }
 
 void task1(void* arg)
@@ -47,6 +48,7 @@ void task1(void* arg)
             }
             last_state = current_state;
         }
+        gpio_intr_enable(GPIO_BUTTON_PIN);
     }
 }
 
