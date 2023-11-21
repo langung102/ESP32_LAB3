@@ -33,21 +33,27 @@ void IRAM_ATTR gpio_isr_handler(void* arg)
 void task1(void* arg)
 {
     uint32_t io_num;
-    uint32_t current_state;
-    uint32_t last_state = 0;
-    bool led = 1;
+    uint8_t led = 1;
     while(1) {
         if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
             printf("\n\nhello from task 1\n");
             gpio_intr_disable(GPIO_BUTTON_PIN);
-            current_state = gpio_get_level(io_num);
-            if (current_state != last_state && current_state != 1) {
-                vTaskDelay(pdMS_TO_TICKS(DEBOUNCE_DELAY_MS));
-                gpio_set_level(GPIO_LED_PIN, led);
-                led = !led;
-                printf("button is pressed\n");
+            switch (led)
+            {
+            case 1:
+                gpio_set_level(GPIO_LED_PIN, 0);
+                printf("OFF led\n");
+                led = 0;
+                break;
+            case 0:
+                gpio_set_level(GPIO_LED_PIN, 1);
+                printf("ON led\n");
+                led = 1;
+            default:
+                break;
             }
-            last_state = current_state;
+            for (long i=0; i<COUNT_HIGH/2; i++) {
+            }  
             gpio_intr_enable(GPIO_BUTTON_PIN);
         }
     }
