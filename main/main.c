@@ -19,7 +19,8 @@
 
 #define DEBOUNCE_DELAY_MS           50
 
-int slicing_flag = 0;
+bool slicing_flag = 0;
+bool is_button_pressed = 0;
 volatile long unsigned int task2_count = 0;
 volatile long unsigned int task3_count = 0;
 
@@ -30,23 +31,35 @@ SemaphoreHandle_t binarysem;
 void IRAM_ATTR gpio_isr_handler(void* arg)
 {
     xSemaphoreGive(binarysem);
+    is_button_pressed = 1;
+    gpio_intr_disable(GPIO_BUTTON_PIN);
 }
 
 void task1(void* arg)
 {
-    uint32_t led_state = 0;
+    uint32_t io_num;
+    uint8_t led = 1;
     while(1) {
         if(xSemaphoreTake(binarysem, portMAX_DELAY) == pdTRUE) {
             printf("\n\nhello from task 1\n");
-            if (led_state == 0) {
-                gpio_set_level(GPIO_LED_PIN, 1);
-                led_state = 1;
-            } else {
+            gpio_intr_disable(GPIO_BUTTON_PIN);
+            switch (led)
+            {
+            case 1:
                 gpio_set_level(GPIO_LED_PIN, 0);
-                led_state = 0;
+                printf("OFF led\n");
+                led = 0;
+                break;
+            case 0:
+                gpio_set_level(GPIO_LED_PIN, 1);
+                printf("ON led\n");
+                led = 1;
+            default:
+                break;
             }
-            printf("button is pressed\n");
-            vTaskDelay(pdMS_TO_TICKS(DEBOUNCE_DELAY_MS));
+            for (long i=0; i<COUNT_HIGH/2; i++) {
+            }  
+            gpio_intr_enable(GPIO_BUTTON_PIN);
         }
     }
 }
@@ -67,7 +80,12 @@ void task3(void* arg) {
     while(1) {
         printf("\n\nhello from task 3\n\n");
         for (task3_count=0; task3_count<COUNT_HIGH*2; task3_count++) {
+            if (is_button_pressed == 1) {
+                printf("button is pressed, task 1 unblock\n");
+                is_button_pressed = 0;
+            }
             if (task3_count == COUNT_HIGH/2) {
+                printf("send to queue, task 2 unblock\n");
                 xQueueSendFromISR(count_evt_queue, &task3_count, NULL);
             }
         }        
